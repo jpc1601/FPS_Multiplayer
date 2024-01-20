@@ -19,10 +19,10 @@ public class PlayerController : MonoBehaviour
     private Vector3 _movement;
 
     private float _shotCounter;
-    private const float TimeBetweenShots = 0.1f;
+    private float _muzzleCounter;
 
+    public float muzzleDisplayTime;
     public float maxHeat = 10f;
-    public float heatPerShot = 1f;
     public float coolDownRate = 4f;
     public float overHeatCoolDownRate = 5f;
 
@@ -43,11 +43,17 @@ public class PlayerController : MonoBehaviour
         _camera = Camera.main;
 
         _uiController.weaponTemperature.maxValue = maxHeat;
+
     }
 
     private void Start()
     {
         Cursor.lockState = CursorLockMode.Locked;
+        
+        var targetTransform = SpawnManager.Instance.GetPlayerTransform();
+        var playerTransform = transform;
+        playerTransform.position = targetTransform.position;
+        playerTransform.rotation = targetTransform.rotation;
         SwitchGun();
     }
 
@@ -96,14 +102,21 @@ public class PlayerController : MonoBehaviour
         //Applied Gravity
         _movement.y += Physics.gravity.y * Time.deltaTime * gravityMode;
         _characterController.Move(_movement * Time.deltaTime);
-        
+
+        if(allGuns[_selectedGun].muzzleFlash.activeInHierarchy)
+        {
+            _muzzleCounter -= Time.deltaTime;
+            if(_muzzleCounter <= 0)
+                allGuns[_selectedGun].muzzleFlash.SetActive(false);
+        }
 
         if(!_isOverHeated)
         {
+            // Debug.Log("Selected Gun::" + _selectedGun);
             if (Input.GetMouseButtonDown(0))
                 Shoot();
 
-            if (Input.GetMouseButton(0))
+            if (allGuns[_selectedGun].isAutomatic && Input.GetMouseButton(0))
             {
                 _shotCounter -= Time.deltaTime;
                 if (_shotCounter <= 0)
@@ -118,6 +131,7 @@ public class PlayerController : MonoBehaviour
             if (_heatCounter <= 0)
                 _heatCounter = 0;
         }
+        
         if (_heatCounter <= 0)
         {
             _uiController.heatedText.SetActive(false);
@@ -126,14 +140,14 @@ public class PlayerController : MonoBehaviour
         _uiController.weaponTemperature.value = _heatCounter;
 
         float mouseScroll = Input.GetAxisRaw("Mouse ScrollWheel");
-        if(mouseScroll != 0)
-            Debug.Log(Mathf.RoundToInt(mouseScroll) +" -- " + Mathf.CeilToInt(mouseScroll) +" ==  " + Mathf.FloorToInt(mouseScroll));
+        // if(mouseScroll != 0)
+        //     Debug.Log(Mathf.RoundToInt(mouseScroll) +" -- " + Mathf.CeilToInt(mouseScroll) +" ==  " + Mathf.FloorToInt(mouseScroll));
 
         if (mouseScroll > 0)
         {
             _selectedGun++;
-            if (_selectedGun > allGuns.Length)
-                _selectedGun = allGuns.Length;
+            if (_selectedGun >= allGuns.Length)
+                _selectedGun = allGuns.Length - 1;
             
             SwitchGun();
         }
@@ -146,7 +160,13 @@ public class PlayerController : MonoBehaviour
             SwitchGun();
         }
 
-
+        for (var i = 0; i < allGuns.Length; i++)
+        {
+            if (!Input.GetKeyDown((i + 1).ToString())) continue;
+            _selectedGun = i;
+            SwitchGun();
+        }
+        
         //Freeing and Locking Cursor
         if (Input.GetKeyDown(KeyCode.Escape))
             Cursor.lockState = CursorLockMode.None;
@@ -174,15 +194,18 @@ public class PlayerController : MonoBehaviour
             Destroy(bulletImpact, 5f);
         }
 
-        _shotCounter += TimeBetweenShots;
+        _shotCounter += allGuns[_selectedGun].timeBetweenShots;
 
-        _heatCounter += heatPerShot;
+        _heatCounter += allGuns[_selectedGun].heatPerShot;
         if (_heatCounter >= maxHeat)
         {
             _uiController.heatedText.SetActive(true);
             _heatCounter = maxHeat;
             _isOverHeated = true;
         }
+        
+        allGuns[_selectedGun].muzzleFlash.SetActive(true);
+        _muzzleCounter = muzzleDisplayTime;
     }
 
     private void SwitchGun()
@@ -191,5 +214,6 @@ public class PlayerController : MonoBehaviour
             gun.gameObject.SetActive(false);
         
         allGuns[_selectedGun].gameObject.SetActive(true);
+        allGuns[_selectedGun].muzzleFlash.SetActive(false);
     }
 }
